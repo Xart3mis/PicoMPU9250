@@ -31,13 +31,15 @@ class IMU:
         self.pitch_prev = 0
         self.roll_prev = 0
 
+        # self.fuse.beta = 1.33011956
+
         for _ in range(300):
             self.fuse.update(self.imu.accel.xyz, self.imu.gyro.xyz, self.imu.mag.xyz)
 
     @property
     def inmotion(self) -> bool:
         self.update()
-        inmotion = False
+        _inmotion = False
         # ax, ay, az = self.imu.accel.xyz
         heading, roll, pitch = self.fuse.heading, self.fuse.roll, self.fuse.pitch
 
@@ -47,33 +49,34 @@ class IMU:
             or abs(roll - self.roll_prev) > self.motion_threshold
         ):
             self.motion_count += 1
-            inmotion = True
+            _inmotion = True
 
             if self.__verbose__:
                 print("motion:", self.motion_count)
 
         else:
             self.motion_count = 0
-            inmotion = False
+            _inmotion = False
 
         self.heading_prev = heading
         self.pitch_prev = pitch
         self.roll_prev = roll
 
-        return inmotion
+        return _inmotion
 
-    def update(self) -> tuple:
+    def update(self, rate=30) -> tuple:
+        time.sleep_ms(rate)
         return self.fuse.update(self.imu.accel.xyz, self.imu.gyro.xyz, self.imu.mag.xyz)
 
 
-class Gesture:
+class Motion:
     def __init__(self, imu_: IMU) -> None:
         self.imu: IMU = imu_
         self.samples: list = []
         self.__prev_samples__: list = []
 
-    def update(self) -> None:
-        self.imu.update()
+    def update(self, rate=20) -> None:
+        self.imu.update(rate=rate)
         if self.imu.inmotion and self.imu.motion_count > 3:
             self.samples.append((self.imu.fuse.heading, self.imu.fuse.roll, self.imu.fuse.pitch))
         else:
@@ -81,10 +84,26 @@ class Gesture:
 
 
 if __name__ == "__main__":
-    imu = IMU(motion_threshold=0.62)
-    gesture = Gesture(imu)
+    imu = IMU(motion_threshold=3)
+    motion = Motion(imu)
+
+    prev_3 = [False] * 3
+    curr = ""
 
     while True:
-        gesture.update()
-        # gesture.samples
-        print(gesture.samples)
+        motion.update(rate=0)
+        ax, ay, az = imu.imu.accel.xyz
+        gx, gy, gz = imu.imu.gyro.xyz
+        inmotion = imu.inmotion
+
+        curr = [imu.fuse.heading, imu.fuse.roll, imu.fuse.pitch, ax, ay, az, gx, gy, gz, inmotion]
+        prev_3.append(curr[-1])
+
+        if len(prev_3) > 3:
+            prev_3.pop(0)
+
+        if not curr[-1] and all(prev_3):
+            inmotion = True
+            curr[-1] = inmotion
+
+        print("".join([str(v) + ("," if i < len(curr) - 1 else "") for i, v in enumerate(curr)]))
