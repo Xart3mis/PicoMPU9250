@@ -4,7 +4,7 @@ from fusion import Fusion
 import utime as time
 
 
-class IMU_Collection:
+class IMU:
     def __init__(
         self,
         i2c_id: int = 0,
@@ -30,6 +30,9 @@ class IMU_Collection:
         self.heading_prev = 0
         self.pitch_prev = 0
         self.roll_prev = 0
+
+        for _ in range(300):
+            self.fuse.update(self.imu.accel.xyz, self.imu.gyro.xyz, self.imu.mag.xyz)
 
     @property
     def inmotion(self) -> bool:
@@ -64,15 +67,24 @@ class IMU_Collection:
 
 
 class Gesture:
-    def __init__(self) -> None:
-        pass
+    def __init__(self, imu_: IMU) -> None:
+        self.imu: IMU = imu_
+        self.samples: list = []
+        self.__prev_samples__: list = []
+
+    def update(self) -> None:
+        self.imu.update()
+        if self.imu.inmotion and self.imu.motion_count > 3:
+            self.samples.append((self.imu.fuse.heading, self.imu.fuse.roll, self.imu.fuse.pitch))
+        else:
+            self.samples.clear()
 
 
 if __name__ == "__main__":
-    collect = IMU_Collection(motion_threshold=0.85)
-    print("heading,roll,pitch,count")
-    count = 0
+    imu = IMU(motion_threshold=0.62)
+    gesture = Gesture(imu)
+
     while True:
-        if collect.inmotion and collect.motion_count > 5:
-            print(f"{collect.fuse.heading},{collect.fuse.roll},{collect.fuse.pitch},{count}")
-            count += 1
+        gesture.update()
+        # gesture.samples
+        print(gesture.samples)
