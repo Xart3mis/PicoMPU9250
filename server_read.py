@@ -1,7 +1,7 @@
 import serial
 
-serial = serial.Serial("/dev/ttyACM0", 115200)  # Port and Baud rate
+serial = serial.Serial("/dev/ttyACM0", 115200)
 
 while True:
-    line = serial.readline()  # Blocks until EOL is received
-    print(line.decode("utf-8"))
+    line = serial.readline()
+    print(line.decode("utf-8").strip())
